@@ -2,8 +2,6 @@
 
 Automatically closes all sub-issues associated with a parent issue when the parent is closed.
 
-![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-blue) ![License](https://img.shields.io/badge/License-MIT-green)
-
 ## Features
 
 - Automatically closes all open sub-issues when parent issue is closed

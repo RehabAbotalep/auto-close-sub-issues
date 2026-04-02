@@ -18,6 +18,8 @@ async function run() {
       throw new Error(`Invalid issue_number: "${issueNumber}". Expected a numeric value.`);
     }
 
+    const issueNumberInt = parseInt(issueNumber, 10);
+
     // Initialize Octokit
     const octokit = new Octokit({ auth: token });
 
@@ -31,12 +33,13 @@ async function run() {
     let page = 1;
     let hasMore = true;
     const perPage = 100; // Maximum allowed by GitHub API
+    let totalSubIssues = 0;
 
     while (hasMore) {
       const response = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/sub_issues', {
         owner,
         repo,
-        issue_number: issueNumber,
+        issue_number: issueNumberInt,
         per_page: perPage,
         page,
         headers: {
@@ -48,6 +51,7 @@ async function run() {
       if (issues.length === 0) {
         hasMore = false;
       } else {
+        totalSubIssues += issues.length;
         // Only collect open sub-issues; closed ones should remain unchanged
         subIssues.push(...issues
           .filter((issue) => issue.state === 'open')
@@ -63,9 +67,9 @@ async function run() {
 
     // Check if there are sub-issues
     if (subIssues.length === 0) {
-      core.info('No sub-issues found for the parent issue.');
+      core.info('No open sub-issues found for the parent issue.');
       core.setOutput('closed_count', 0);
-      core.setOutput('total_count', 0);
+      core.setOutput('total_count', totalSubIssues);
       return;
     }
 
@@ -86,6 +90,7 @@ async function run() {
             repo,
             issue_number: subIssueNumber,
             state: 'closed',
+            state_reason: 'completed',
           });
           core.info(`Successfully closed sub-issue #${subIssueNumber}`);
           return { success: true, number: subIssueNumber };
@@ -105,17 +110,21 @@ async function run() {
       });
     }
 
-    // Add comment to parent issue if any sub-issues were closed
-    if (closedIssues.length > 0) {
-      const closedList = closedIssues.map(num => `#${num}`).join(' ');
-      const commentBody = failedIssues.length > 0
-        ? `✅ Automatically closed the following sub-issues: ${closedList}\n\n⚠️ Failed to close ${failedIssues.length} sub-issue(s): ${failedIssues.map(num => `#${num}`).join(' ')}`
-        : `✅ Automatically closed the following sub-issues: ${closedList}`;
-      
+    // Add comment to parent issue
+    if (closedIssues.length > 0 || failedIssues.length > 0) {
+      let commentBody;
+      if (closedIssues.length > 0 && failedIssues.length > 0) {
+        commentBody = `✅ Automatically closed the following sub-issues: ${closedIssues.map(num => `#${num}`).join(' ')}\n\n⚠️ Failed to close ${failedIssues.length} sub-issue(s): ${failedIssues.map(num => `#${num}`).join(' ')}`;
+      } else if (closedIssues.length > 0) {
+        commentBody = `✅ Automatically closed the following sub-issues: ${closedIssues.map(num => `#${num}`).join(' ')}`;
+      } else {
+        commentBody = `⚠️ Failed to close all sub-issue(s): ${failedIssues.map(num => `#${num}`).join(' ')}`;
+      }
+
       await octokit.issues.createComment({
         owner,
         repo,
-        issue_number: parseInt(issueNumber, 10),
+        issue_number: issueNumberInt,
         body: commentBody
       });
       core.info('Added comment to parent issue.');
@@ -123,7 +132,7 @@ async function run() {
 
     // Set outputs
     core.setOutput('closed_count', closedIssues.length);
-    core.setOutput('total_count', subIssues.length);
+    core.setOutput('total_count', totalSubIssues);
     
     const summary = `Closed ${closedIssues.length}/${subIssues.length} sub-issue(s).`;
     if (failedIssues.length > 0) {

@@ -61,21 +61,30 @@ describe('Close Sub-Issues Action', () => {
     
     await require('../src/index.js');
 
-    expect(core.info).toHaveBeenCalledWith('No sub-issues found for the parent issue.');
+    expect(core.info).toHaveBeenCalledWith('No open sub-issues found for the parent issue.');
   });
 
-  test('should only collect open sub-issues', async () => {
+  test('should only close open sub-issues', async () => {
     const mockSubIssues = [
       { number: 1, state: 'open' },
       { number: 2, state: 'open' },
       { number: 3, state: 'closed' }  // Should be filtered out
     ];
 
-    // Filter like the actual code does
-    const openIssues = mockSubIssues.filter(issue => issue.state === 'open');
-    
-    expect(openIssues).toHaveLength(2);
-    expect(openIssues.map(i => i.number)).toEqual([1, 2]);
+    mockOctokit.request.mockResolvedValue({ data: mockSubIssues });
+    mockOctokit.issues.update.mockResolvedValue({});
+    mockOctokit.issues.createComment.mockResolvedValue({});
+
+    jest.resetModules();
+    jest.doMock('@actions/core', () => core);
+    jest.doMock('@octokit/rest', () => ({ Octokit: jest.fn(() => mockOctokit) }));
+
+    await require('../src/index.js');
+
+    expect(mockOctokit.issues.update).toHaveBeenCalledTimes(2);
+    expect(mockOctokit.issues.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ issue_number: 3 })
+    );
   });
 
   test('should validate issue number is numeric', async () => {
@@ -97,5 +106,29 @@ describe('Close Sub-Issues Action', () => {
     expect(core.setFailed).toHaveBeenCalledWith(
       expect.stringContaining('Invalid issue_number')
     );
+  });
+
+  test('should close all open sub-issues and post a comment', async () => {
+    const mockSubIssues = [
+      { number: 1, state: 'open' },
+      { number: 2, state: 'open' },
+    ];
+
+    mockOctokit.request.mockResolvedValue({ data: mockSubIssues });
+    mockOctokit.issues.update.mockResolvedValue({});
+    mockOctokit.issues.createComment.mockResolvedValue({});
+
+    jest.resetModules();
+    jest.doMock('@actions/core', () => core);
+    jest.doMock('@octokit/rest', () => ({ Octokit: jest.fn(() => mockOctokit) }));
+
+    require('../src/index.js');
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockOctokit.issues.update).toHaveBeenCalledTimes(2);
+    expect(mockOctokit.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(core.setOutput).toHaveBeenCalledWith('closed_count', 2);
+    expect(core.setOutput).toHaveBeenCalledWith('total_count', 2);
+    expect(core.setFailed).not.toHaveBeenCalled();
   });
 });

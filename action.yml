@@ -9,21 +9,18 @@ inputs:
   github_token:
     description: "GitHub token for authentication."
     required: true
-    type: string
   issue_number:
     description: "The issue number of the parent issue."
     required: true
-    type: string
   repository:
     description: "The repository in 'owner/repo' format."
     required: true
-    type: string
 
 outputs:
   closed_count:
     description: "The number of sub-issues that were successfully closed."
   total_count:
-    description: "The total number of sub-issues found."
+    description: "The total number of sub-issues found, including already-closed ones."
 
 runs:
   using: "node20"
