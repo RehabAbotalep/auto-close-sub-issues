@@ -1,4 +1,4 @@
-# Close Sub-Issues Action
+# Auto Close Sub-Issues
 
 Automatically closes all sub-issues associated with a parent issue when the parent is closed.
 

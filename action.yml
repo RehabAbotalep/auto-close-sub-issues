@@ -1,5 +1,5 @@
-name: Close Sub-Issues Automatically
-description: Automatically closes all sub-issues when their parent issue is closed, keeping your issue hierarchy clean and in sync.
+name: Auto Close Sub-Issues
+description: Automatically closes all sub-issues associated with a parent issue when the parent is closed.
 author: Rehab Ragab
 branding:
   icon: "check-circle"
